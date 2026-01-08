@@ -12,6 +12,7 @@
 #include "comic_db.h"
 #include "yacreader_global_gui.h"
 #include "configuration.h"
+#include "image_decoders.h"
 
 template<class T>
 inline const T &kClamp(const T &x, const T &low, const T &high)
@@ -346,7 +347,14 @@ void PageRender::run()
     QMutexLocker locker(&(render->mutex));
 
     QImage img;
-    img.loadFromData(data);
+    if (isAvif(data)) {
+        img = decodeAvif(data);
+    } else if (isJxl(data)) {
+        img = decodeJxl(data);
+    } else {
+        img.loadFromData(data);
+    }
+
     if (degrees > 0) {
         QTransform m;
         m.rotate(degrees);
