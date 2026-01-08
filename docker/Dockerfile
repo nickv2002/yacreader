@@ -51,7 +51,9 @@ RUN \
        7zip \
        7zip-rar \
        libpoppler-qt6-dev \
-       zlib1g-dev && \
+       zlib1g-dev \
+       libavif-dev \
+       libjxl-dev && \
     ldconfig
 
 

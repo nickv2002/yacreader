@@ -67,6 +67,8 @@ macx {
     lessThan(QT_MAJOR_VERSION, 6): QT += macextras
 }
 
+LIBS += -lavif -ljxl -ljxl_threads
+
 QT += network widgets core multimedia svg
 
 greaterThan(QT_MAJOR_VERSION, 5): QT += openglwidgets core5compat
@@ -109,6 +111,7 @@ HEADERS +=  ../common/comic.h \
             ../common/opengl_checker.h \
             ../common/pdf_comic.h \
             ../common/global_info_provider.h \
+            image_decoders.h \
 
 !CONFIG(no_opengl) {
     HEADERS += ../common/gl/yacreader_flow_gl.h \
@@ -117,6 +120,7 @@ HEADERS +=  ../common/comic.h \
 
 SOURCES +=  ../common/comic.cpp \
             configuration.cpp \
+            image_decoders.cpp \
             goto_dialog.cpp \
             magnifying_glass.cpp \
             main_window_viewer.cpp \
