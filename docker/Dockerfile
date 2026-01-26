@@ -20,8 +20,6 @@ RUN apt-get update && \
     g++ \
     gcc \
     git \
-    libavif-dev \
-    libheif-dev \
     make \
     qt6-base-dev \
     qt6-base-private-dev \
@@ -32,7 +30,49 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # ============================================================================
-# Stage 2: 7zip builder
+# Stage 2: kimageformats builder
+# ============================================================================
+FROM plugin-base AS kimageformats-builder
+
+# Install additional dependencies for kimageformats
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libavif-dev \
+    libheif-dev \
+    libjxl-dev \
+    libarchive-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Build ECM 6.0.0 for KF6 (compatible with Qt 6.4)
+WORKDIR /tmp/ecm
+RUN git clone --depth 1 --branch v6.0.0 https://invent.kde.org/frameworks/extra-cmake-modules.git .
+RUN mkdir build
+WORKDIR /tmp/ecm/build
+RUN cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DBUILD_TESTING=OFF
+RUN make -j$(nproc)
+RUN make install
+
+# Build kimageformats 6.0.0 from KDE source (patched for Qt 6.4)
+WORKDIR /tmp/kimageformats
+RUN git clone --depth 1 --branch v6.0.0 https://invent.kde.org/frameworks/kimageformats.git .
+# Patch to work with Qt 6.4 (Noble has 6.4.2, kimageformats wants 6.5+)
+RUN sed -i 's/6\.5\.0/6.4.0/g' CMakeLists.txt
+RUN mkdir build
+WORKDIR /tmp/kimageformats/build
+RUN cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DBUILD_TESTING=OFF \
+    -DQT_MAJOR_VERSION=6
+RUN make -j$(nproc)
+RUN make install DESTDIR=/output
+
+# ============================================================================
+# Stage 3: 7zip builder
 # ============================================================================
 FROM plugin-base AS sevenzip-builder
 
@@ -53,76 +93,7 @@ RUN mkdir -p /app/lib/7zip && \
     cp ./_o/7z.so /app/lib/7zip
 
 # ============================================================================
-# Stage 3: HEIC/HEIF plugin builder
-# ============================================================================
-FROM plugin-base AS heic-plugin-builder
-
-WORKDIR /tmp/qt-heic
-RUN git clone https://github.com/novomesk/qt-heic-image-plugin.git .
-RUN mkdir build
-WORKDIR /tmp/qt-heic/build
-RUN cmake .. \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX=/usr \
-    -DQT_MAJOR_VERSION=6
-RUN make -j$(nproc)
-RUN make install DESTDIR=/output
-
-# ============================================================================
-# Stage 4: libjxl + JXL plugin builder (merged)
-# (0.10.2 required for JxlEncoderDistanceFromQuality)
-# ============================================================================
-FROM plugin-base AS jxl-plugin-builder
-
-# Build libjxl 0.10.2
-WORKDIR /tmp/libjxl
-RUN git clone --depth 1 --branch v0.10.2 https://github.com/libjxl/libjxl.git .
-RUN ./deps.sh
-RUN mkdir build
-WORKDIR /tmp/libjxl/build
-RUN cmake .. \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_TESTING=OFF \
-    -DJPEGXL_ENABLE_BENCHMARK=OFF \
-    -DJPEGXL_ENABLE_EXAMPLES=OFF \
-    -DJPEGXL_ENABLE_MANPAGES=OFF \
-    -DJPEGXL_ENABLE_PLUGINS=OFF \
-    -DJPEGXL_ENABLE_TOOLS=OFF \
-    -DCMAKE_INSTALL_PREFIX=/usr
-RUN make -j$(nproc)
-RUN make install
-RUN make install DESTDIR=/output
-
-# Build JXL plugin
-WORKDIR /tmp/qt-jxl
-RUN git clone https://github.com/novomesk/qt-jpegxl-image-plugin.git .
-RUN mkdir build
-WORKDIR /tmp/qt-jxl/build
-RUN cmake .. \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX=/usr \
-    -DQT_MAJOR_VERSION=6
-RUN make -j$(nproc)
-RUN make install DESTDIR=/output
-
-# ============================================================================
-# Stage 5: AVIF plugin builder
-# ============================================================================
-FROM plugin-base AS avif-plugin-builder
-
-WORKDIR /tmp/qt-avif
-RUN git clone https://github.com/novomesk/qt-avif-image-plugin.git .
-RUN mkdir build
-WORKDIR /tmp/qt-avif/build
-RUN cmake .. \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX=/usr \
-    -DQT_MAJOR_VERSION=6
-RUN make -j$(nproc)
-RUN make install DESTDIR=/output
-
-# ============================================================================
-# Stage 6: YACReader builder
+# Stage 4: YACReader builder
 # ============================================================================
 FROM plugin-base AS yacreader-builder
 
@@ -177,12 +148,8 @@ RUN git clone https://github.com/YACReader/yacreader.git /src/git && \
 COPY --from=sevenzip-builder /src/7zip/lib7zip /src/git/compressed_archive/lib7zip
 COPY --from=sevenzip-builder /app/lib/7zip /app/lib/7zip
 
-# Copy Qt image format plugins from separate stages
-COPY --from=avif-plugin-builder /output/usr/lib/x86_64-linux-gnu/qt6/plugins/imageformats/ \
-    /usr/lib/x86_64-linux-gnu/qt6/plugins/imageformats/
-COPY --from=jxl-plugin-builder /output/usr/lib/x86_64-linux-gnu/qt6/plugins/imageformats/ \
-    /usr/lib/x86_64-linux-gnu/qt6/plugins/imageformats/
-COPY --from=heic-plugin-builder /output/usr/lib/x86_64-linux-gnu/qt6/plugins/imageformats/ \
+# Copy kimageformats Qt6 plugins
+COPY --from=kimageformats-builder /output/usr/lib/x86_64-linux-gnu/qt6/plugins/imageformats/ \
     /usr/lib/x86_64-linux-gnu/qt6/plugins/imageformats/
 
 # Build YACReaderLibraryServer
@@ -193,7 +160,7 @@ RUN cd /src/git/YACReaderLibraryServer && \
     make install
 
 # ============================================================================
-# Stage 7: Final runtime image (minimal, no build assets)
+# Stage 5: Final runtime image (minimal, no build assets)
 # ============================================================================
 FROM base AS runtime
 
@@ -209,26 +176,20 @@ RUN apt-get update && \
     libqt6core5compat6 \
     libpoppler-qt6-3t64 \
     qt6-image-formats-plugins \
-    libqt6network6t64 \
-    libqt6sql6-sqlite \
     libavif16 \
-    libheif1 && \
+    libheif1 \
+    libjxl0.7 \
+    libqt6network6t64 \
+    libqt6sql6-sqlite && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Copy YACReaderLibraryServer application from builder
 COPY --from=yacreader-builder /app /app
 
-# Copy Qt image format plugins from plugin builders
-COPY --from=avif-plugin-builder /output/usr/lib/x86_64-linux-gnu/qt6/plugins/imageformats/ \
+# Copy kimageformats Qt6 plugins (must be done before ldconfig)
+COPY --from=kimageformats-builder /output/usr/lib/x86_64-linux-gnu/qt6/plugins/imageformats/*.so \
     /usr/lib/x86_64-linux-gnu/qt6/plugins/imageformats/
-COPY --from=jxl-plugin-builder /output/usr/lib/x86_64-linux-gnu/qt6/plugins/imageformats/ \
-    /usr/lib/x86_64-linux-gnu/qt6/plugins/imageformats/
-COPY --from=heic-plugin-builder /output/usr/lib/x86_64-linux-gnu/qt6/plugins/imageformats/ \
-    /usr/lib/x86_64-linux-gnu/qt6/plugins/imageformats/
-
-# Copy libjxl 0.10.2 runtime libraries (not available in Ubuntu noble)
-COPY --from=jxl-plugin-builder /output/usr/lib/ /usr/lib/
 
 # Refresh dynamic linker cache
 RUN ldconfig
