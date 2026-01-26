@@ -38,7 +38,6 @@ FROM plugin-base AS kimageformats-builder
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     libavif-dev \
-    libheif-dev \
     libjxl-dev \
     libarchive-dev && \
     apt-get clean && \
@@ -177,7 +176,6 @@ RUN apt-get update && \
     libpoppler-qt6-3t64 \
     qt6-image-formats-plugins \
     libavif16 \
-    libheif1 \
     libjxl0.7 \
     libqt6network6t64 \
     libqt6sql6-sqlite && \
