@@ -5,8 +5,6 @@ FROM ghcr.io/linuxserver/baseimage-ubuntu:noble AS base
 # ============================================================================
 FROM base AS kimageformats-builder
 
-ARG DEBIAN_FRONTEND="noninteractive"
-
 # Install build packages and dependencies for kimageformats
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
