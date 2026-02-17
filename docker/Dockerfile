@@ -1,13 +1,13 @@
 FROM ghcr.io/linuxserver/baseimage-ubuntu:noble AS base
 
 # ============================================================================
-# Stage: plugin-base
+# Stage: kimageformats-builder
 # ============================================================================
-FROM base AS plugin-base
+FROM base AS kimageformats-builder
 
 ARG DEBIAN_FRONTEND="noninteractive"
 
-# Install common build packages used by plugin builders
+# Install build packages and dependencies for kimageformats
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     build-essential \
@@ -16,24 +16,13 @@ RUN apt-get update && \
     g++ \
     gcc \
     git \
-    make \
-    qt6-base-dev \
-    qt6-base-private-dev \
-    pkg-config && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# ============================================================================
-# Stage: kimageformats-builder
-# ============================================================================
-FROM plugin-base AS kimageformats-builder
-
-# Install additional dependencies for kimageformats
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
     libavif-dev \
+    libarchive-dev \
     libjxl-dev \
-    libarchive-dev && \
+    make \
+    pkg-config \
+    qt6-base-dev \
+    qt6-base-private-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
