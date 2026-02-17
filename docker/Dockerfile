@@ -1,6 +1,62 @@
 FROM ghcr.io/linuxserver/baseimage-ubuntu:noble AS base
 
 # ============================================================================
+# Stage: plugin-base
+# ============================================================================
+FROM base AS plugin-base
+
+ARG DEBIAN_FRONTEND="noninteractive"
+
+# Install common build packages used by plugin builders
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    extra-cmake-modules \
+    g++ \
+    gcc \
+    git \
+    make \
+    qt6-base-dev \
+    qt6-base-private-dev \
+    pkg-config && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# ============================================================================
+# Stage: kimageformats-builder
+# ============================================================================
+FROM plugin-base AS kimageformats-builder
+
+# Install additional dependencies for kimageformats
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libavif-dev \
+    libjxl-dev \
+    libarchive-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Build ECM 6.0.0 for KF6 (compatible with Qt 6.4)
+RUN mkdir -p /tmp/ecm && \
+    git clone --depth 1 --branch v6.0.0 https://invent.kde.org/frameworks/extra-cmake-modules.git /tmp/ecm && \
+    mkdir -p /tmp/ecm/build && \
+    cd /tmp/ecm/build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_TESTING=OFF && \
+    make -j$(nproc) && \
+    make install
+
+# Build kimageformats 6.0.0 from KDE source (patched for Qt 6.4)
+RUN mkdir -p /tmp/kimageformats && \
+    git clone --depth 1 --branch v6.0.0 https://invent.kde.org/frameworks/kimageformats.git /tmp/kimageformats && \
+    sed -i 's/6\.5\.0/6.4.0/g' /tmp/kimageformats/CMakeLists.txt && \
+    mkdir -p /tmp/kimageformats/build && \
+    cd /tmp/kimageformats/build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_TESTING=OFF -DQT_MAJOR_VERSION=6 && \
+    make -j$(nproc) && \
+    make install DESTDIR=/output
+
+# ============================================================================
 # Stage: sevenzip-builder
 # ============================================================================
 FROM base AS sevenzip-builder
@@ -93,6 +149,9 @@ RUN git clone https://github.com/YACReader/yacreader.git /src/git && \
 COPY --from=sevenzip-builder /tmp/lib7zip /src/git/compressed_archive/lib7zip
 COPY --from=sevenzip-builder /app/lib/7zip /app/lib/7zip
 
+# Copy kimageformats Qt6 plugins to builder
+COPY --from=kimageformats-builder /output/usr/lib/x86_64-linux-gnu/qt6/plugins/imageformats/*.so /usr/lib/x86_64-linux-gnu/qt6/plugins/imageformats/
+
 # build yacreaderlibraryserver
 RUN cd /src/git/YACReaderLibraryServer && \
     qmake6 PREFIX=/app CONFIG+="7zip server_standalone" YACReaderLibraryServer.pro && \
@@ -113,14 +172,19 @@ LABEL maintainer="luisangelsm"
 # Copy the built application from the builder stage
 COPY --from=yacreader-builder /app /app
 
+# Copy kimageformats Qt6 plugins to runtime
+COPY --from=kimageformats-builder /output/usr/lib/x86_64-linux-gnu/qt6/plugins/imageformats/*.so /usr/lib/x86_64-linux-gnu/qt6/plugins/imageformats/
+
 # runtime packages
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
        libqt6core5compat6 \
        libpoppler-qt6-3t64 \
-       qt6-image-formats-plugins \ 
+       qt6-image-formats-plugins \
        libqt6network6t64 \
-       libqt6sql6-sqlite && \
+       libqt6sql6-sqlite \
+       libavif16 \
+       libjxl0.7 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
