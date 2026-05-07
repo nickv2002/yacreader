@@ -31,7 +31,7 @@ RUN cd "/tmp/lib7zip/CPP/7zip/Bundles/Format7zF" && \
 FROM base AS yacreader-builder
 
 # version, it can be a TAG or a branch
-ARG YACR_VERSION="develop"
+ARG YACR_VERSION="9.16.3"
 
 # env variables
 ARG DEBIAN_FRONTEND="noninteractive"
