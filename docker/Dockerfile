@@ -1,4 +1,4 @@
-FROM ghcr.io/linuxserver/baseimage-ubuntu:noble AS base
+FROM ghcr.io/linuxserver/baseimage-ubuntu:resolute AS base
 
 # ============================================================================
 # Stage: sevenzip-builder
@@ -8,10 +8,10 @@ FROM base AS sevenzip-builder
 # get 7zip source
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-       7zip \
-       build-essential \
-       make \
-       wget && \
+    7zip \
+    build-essential \
+    make \
+    wget && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -31,7 +31,7 @@ RUN cd "/tmp/lib7zip/CPP/7zip/Bundles/Format7zF" && \
 FROM base AS yacreader-builder
 
 # version, it can be a TAG or a branch
-ARG YACR_VERSION="develop"
+ARG YACR_VERSION="9.16.3"
 
 # env variables
 ARG DEBIAN_FRONTEND="noninteractive"
@@ -43,45 +43,43 @@ LABEL maintainer="luisangelsm"
 RUN \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-       build-essential \
-       desktop-file-utils \
-       gcc \
-       g++ \
-       git \
-       qt6-tools-dev \
-       qt6-base-dev-tools \
-       qmake6 \
-       qmake6-bin \
-       qt6-base-dev \
-       qt6-multimedia-dev \
-       qt6-tools-dev-tools \
-       libgl-dev \
-       qt6-l10n-tools \
-       libqt6opengl6-dev \
-       libunarr-dev \
-       qt6-declarative-dev \
-       libqt6svg6-dev \
-       libqt6core5compat6-dev \
-       libbz2-dev \
-       libglu1-mesa-dev \
-       liblzma-dev \
-       libqt6gui6 \
-       libqt6multimedia6 \
-       libqt6network6 \
-       libqt6qml6 \
-       libqt6quickcontrols2-6 \
-       qt6-image-formats-plugins \
-       libqt6sql6 \
-       libqt6sql6-sqlite \
-       make \
-       sqlite3 \
-       libsqlite3-dev \
-       unzip \
-       wget \
-       7zip \
-       7zip-rar \
-       libpoppler-qt6-dev \
-       zlib1g-dev && \
+    build-essential \
+    desktop-file-utils \
+    gcc \
+    g++ \
+    git \
+    qt6-tools-dev \
+    qt6-base-dev-tools \
+    qmake6 \
+    qmake6-bin \
+    qt6-base-dev \
+    qt6-multimedia-dev \
+    qt6-tools-dev-tools \
+    libgl-dev \
+    qt6-l10n-tools \
+    qt6-declarative-dev \
+    libqt6svg6-dev \
+    libqt6core5compat6-dev \
+    libbz2-dev \
+    libglu1-mesa-dev \
+    liblzma-dev \
+    libqt6gui6 \
+    libqt6multimedia6 \
+    libqt6network6 \
+    libqt6qml6 \
+    libqt6quickcontrols2-6 \
+    qt6-image-formats-plugins \
+    libqt6sql6 \
+    libqt6sql6-sqlite \
+    make \
+    sqlite3 \
+    libsqlite3-dev \
+    unzip \
+    wget \
+    7zip \
+    7zip-rar \
+    libpoppler-qt6-dev \
+    zlib1g-dev && \
     ldconfig
 
 # clone YACReader repo
@@ -116,11 +114,12 @@ COPY --from=yacreader-builder /app /app
 # runtime packages
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-       libqt6core5compat6 \
-       libpoppler-qt6-3t64 \
-       qt6-image-formats-plugins \ 
-       libqt6network6t64 \
-       libqt6sql6-sqlite && \
+    libqt6core5compat6 \
+    libpoppler-qt6-3t64 \
+    qt6-image-formats-plugins \
+    libqt6network6 \
+    libqt6sql6-sqlite \
+    kimageformat6-plugins && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
